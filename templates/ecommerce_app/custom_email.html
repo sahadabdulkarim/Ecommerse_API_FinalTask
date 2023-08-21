@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ subject }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            color: #666;
+        }
+        .attachment {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            display: inline-block;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ subject }}</h1>
+    <p>{{ message }}</p>
+
+        {% for file in files %}
+            <div class="attachment">
+                <p>Attachment: {{ file.name }}</p>
+                <p><a href="cid:{{ file.name }}">Download {{ file.name }}</a></p>
+            </div>
+    {% endfor %}
+</body>
+</html>
+
+
