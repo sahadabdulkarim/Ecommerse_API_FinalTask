@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Category, Product
+from .models import CustomUser, Category, Product, ProductReview, Wishlist
 from rest_framework import serializers
 from .models import CustomUser, CartItem, OrderItem, Category, Product, Order
 
@@ -97,3 +97,33 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         return Order.objects.create(**validated_data)
+
+
+from rest_framework import serializers
+
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'email', 'first_name', 'last_name')
+        extra_kwargs = {
+            'email': {'read_only': True},  # Make email read-only to prevent modification
+        }
+
+class WishlistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Wishlist
+        fields = '__all__'
+
+class WishlistAddProductSerializer(serializers.Serializer):
+    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+
+class ProductReviewSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
+    product_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductReview
+        fields = '__all__'
+
+    def get_product_name(self, obj):
+        return obj.product.name

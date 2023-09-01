@@ -9,12 +9,12 @@ from django.contrib.auth import get_user_model, authenticate
 from django.utils.html import strip_tags
 from django.template.loader import render_to_string
 from django.core.mail import send_mail
-from .models import CustomUser, Product, Category, CartItem, Order, OrderItem,Cart
+from .models import CustomUser, Product, Category, CartItem, Order, OrderItem,Cart, ProductReview, Wishlist
 from .serializers import (
     CustomUserSerializer, PasswordResetRequestSerializer,
-    LoginSerializer, PasswordResetSerializer, ProductSerializer,
-    CategorySerializer, UserSerializer, CartItemSerializer,
-    OrderSerializer,
+    LoginSerializer, PasswordResetSerializer, ProductReviewSerializer, ProductSerializer,
+    CategorySerializer, UserProfileUpdateSerializer, UserSerializer, CartItemSerializer,
+    OrderSerializer, WishlistAddProductSerializer, WishlistSerializer,
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
@@ -345,3 +345,103 @@ class CustomEmailView(APIView):
             # Log the error for debugging
             print(e)
             return Response({'message': 'An error occurred while sending the email.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class UserProfileUpdateView(generics.RetrieveUpdateAPIView):
+    serializer_class = UserProfileUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        new_password = request.data.get('password', None)
+
+        # Update password if a new one is provided
+        if new_password:
+            instance.set_password(new_password)
+            instance.save()
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)
+
+class WishlistView(generics.RetrieveAPIView):
+    serializer_class = WishlistSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return Wishlist.objects.get_or_create(user=self.request.user)[0]
+
+class WishlistAddProductView(generics.CreateAPIView):
+    serializer_class = WishlistAddProductSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        wishlist = Wishlist.objects.get_or_create(user=request.user)[0]
+        product_id = request.data.get('product_id')
+
+        try:
+            product = Product.objects.get(pk=product_id)
+        except Product.DoesNotExist:
+            return Response({"message": "Product not found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        wishlist.products.add(product)
+        return Response({"message": "Product added to wishlist"}, status=status.HTTP_201_CREATED)
+    
+class WishlistMoveToCartView(generics.CreateAPIView):
+    serializer_class = WishlistSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        wishlist = Wishlist.objects.get_or_create(user=request.user)[0]
+        product_id = request.data.get('product_id')
+
+        try:
+            product = wishlist.products.get(pk=product_id)
+        except Product.DoesNotExist:
+            return Response({"message": "Product not found in wishlist"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if the product is already in the cart
+        if CartItem.objects.filter(cart__user=request.user, product=product).exists():
+            return Response({"message": "Product is already in the cart"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Add the product to the cart
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        CartItem.objects.create(cart=cart, product=product, quantity=1)
+
+        # Remove the product from the wishlist
+        wishlist.products.remove(product)
+
+        return Response({"message": "Product moved from wishlist to cart"}, status=status.HTTP_200_OK)
+
+
+
+class ProductReviewCreateView(generics.CreateAPIView):
+    serializer_class = ProductReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]  # User must be authenticated to leave a review
+
+    def perform_create(self, serializer):
+        product_id = self.request.data.get('product')
+        user = self.request.user
+        purchased_products = OrderItem.objects.filter(order__user=user, product_id=product_id)
+        
+        if purchased_products.exists():
+            serializer.save(user=user)
+        else:
+            # You can raise a PermissionDenied exception or return an error response
+            raise permissions.PermissionDenied("You can only review products that you have purchased.")
+
+
+class ProductReviewListView(generics.ListAPIView):
+    serializer_class = ProductReviewSerializer
+    permission_classes = [permissions.AllowAny]  # Allow anyone to view reviews
+
+    def get_queryset(self):
+        product_id = self.request.query_params.get('product_id')
+        if product_id:
+            return ProductReview.objects.filter(product_id=product_id)
+        return ProductReview.objects.all()
