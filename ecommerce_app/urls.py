@@ -1,7 +1,7 @@
 from django.urls import path
 
 
-from .views import AddCartView, AdminOrderView, CartItemDetailView, CategoryDetailView, CategoryListView, CustomEmailView, CustomerProductDetailView, CustomerProductListView, CustomerRegistrationView, AdminRegistrationView, LoginView, OrderHistoryView,PasswordResetRequestView, PasswordResetView, PlaceOrderView, ProductDetailView, ProductListView, ProductReviewCreateView, ProductReviewListView, UserDetailView, UserListView, UserProfileUpdateView, WishlistAddProductView, WishlistMoveToCartView, WishlistView
+from .views import AddCartView, AdminOrderView, CartItemDetailView, CategoryDetailView, CategoryListView, CreateCouponView, CustomEmailView, CustomerProductDetailView, CustomerProductListView, CustomerRegistrationView, AdminRegistrationView, ListCouponsView, LoginView, OrderHistoryView,PasswordResetRequestView, PasswordResetView, PlaceOrderView, ProductDetailView, ProductListView, ProductReviewCreateView, ProductReviewListView, UserDetailView, UserListView, UserProfileUpdateView, ValidateCouponForCartView, WishlistAddProductView, WishlistMoveToCartView, WishlistView
 
 urlpatterns = [
     path('register/customer/', CustomerRegistrationView.as_view(), name='customer-register'),
@@ -31,5 +31,7 @@ urlpatterns = [
     path('wishlist/move-to-cart/', WishlistMoveToCartView.as_view(), name='wishlist-move-to-cart'),
     path('reviews/create/', ProductReviewCreateView.as_view(), name='product-review-create'),
     path('reviews/', ProductReviewListView.as_view(), name='product-review-list'),
-
+    path('create_coupon/', CreateCouponView.as_view(), name='create-coupon'),
+    path('list_coupons/', ListCouponsView.as_view(), name='list-coupons'),
+    path('validate_coupon_for_cart/', ValidateCouponForCartView.as_view(), name='validate-coupon-for-cart'),
 ]

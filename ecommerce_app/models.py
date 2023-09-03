@@ -80,10 +80,14 @@ class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     items = models.ManyToManyField(Product, through='OrderItem')
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    total_amount_without_coupon = models.DecimalField(max_digits=10, decimal_places=2,default=0.00)
+    coupon_code = models.CharField(max_length=50, null=True, blank=True)  
+    discounted_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True) 
     order_status = models.CharField(max_length=50,choices=ORDER_STATUS_CHOICES, default='Processing')
     shipping_address = models.CharField(max_length=255) 
     payment_method = models.CharField(max_length=50)     
     created_at = models.DateTimeField(auto_now_add=True)
+    coupon_applied = models.BooleanField(default=False)  # Track whether a coupon has been applied
 
     def __str__(self):
         return f"Order for {self.user.username}"
@@ -99,7 +103,6 @@ class OrderItem(models.Model):
 class Wishlist(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     products = models.ManyToManyField(Product)
-
 class ProductReview(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
@@ -109,3 +112,20 @@ class ProductReview(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.product}"
+
+
+class Coupon(models.Model):
+    coupon_code = models.CharField(max_length=50, unique=True)
+    DISCOUNT_TYPES = [
+        ('amount', 'Amount'),
+        ('percentage', 'Percentage'),
+    ]
+    discount_type = models.CharField(max_length=10, choices=DISCOUNT_TYPES)
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2)
+    min_purchase_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    max_usage = models.PositiveIntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return self.coupon_code

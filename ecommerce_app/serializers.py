@@ -1,8 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Category, Product, ProductReview, Wishlist
-from rest_framework import serializers
-from .models import CustomUser, CartItem, OrderItem, Category, Product, Order
-
+from .models import CustomUser, CartItem, OrderItem, Category, Product, Order,Coupon, CustomUser, Category, Product, ProductReview, Wishlist
 class CustomUserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
@@ -87,20 +84,6 @@ class OrderItemSerializer(serializers.ModelSerializer):
         }
 
 
-class OrderSerializer(serializers.ModelSerializer):
-    order_items = OrderItemSerializer(many=True, read_only=True)
-    user = UserSerializer()
-
-    class Meta:
-        model = Order
-        fields = ['id', 'user', 'total_amount', 'order_status', 'shipping_address', 'payment_method', 'order_items']
-
-    def create(self, validated_data):
-        return Order.objects.create(**validated_data)
-
-
-from rest_framework import serializers
-
 class UserProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
@@ -110,6 +93,7 @@ class UserProfileUpdateSerializer(serializers.ModelSerializer):
         }
 
 class WishlistSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Wishlist
         fields = '__all__'
@@ -127,3 +111,21 @@ class ProductReviewSerializer(serializers.ModelSerializer):
 
     def get_product_name(self, obj):
         return obj.product.name
+    
+    
+class CouponSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coupon
+        fields = '__all__'
+
+class OrderSerializer(serializers.ModelSerializer):
+    order_items = OrderItemSerializer(many=True, read_only=True)
+    user = UserSerializer()
+    discounted_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    coupon_code = serializers.CharField(max_length=255, read_only=True)
+    class Meta:
+        model = Order
+        fields = ['id', 'user', 'total_amount','total_amount_without_coupon', 'order_status', 'shipping_address', 'coupon_code', 'payment_method', 'order_items','discounted_amount']
+
+    def create(self, validated_data):
+        return Order.objects.create(**validated_data)

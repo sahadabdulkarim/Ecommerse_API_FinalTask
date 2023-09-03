@@ -9,9 +9,9 @@ from django.contrib.auth import get_user_model, authenticate
 from django.utils.html import strip_tags
 from django.template.loader import render_to_string
 from django.core.mail import send_mail
-from .models import CustomUser, Product, Category, CartItem, Order, OrderItem,Cart, ProductReview, Wishlist
+from .models import Coupon, CustomUser, Product, Category, CartItem, Order, OrderItem,Cart, ProductReview, Wishlist
 from .serializers import (
-    CustomUserSerializer, PasswordResetRequestSerializer,
+    CouponSerializer, CustomUserSerializer, PasswordResetRequestSerializer,
     LoginSerializer, PasswordResetSerializer, ProductReviewSerializer, ProductSerializer,
     CategorySerializer, UserProfileUpdateSerializer, UserSerializer, CartItemSerializer,
     OrderSerializer, WishlistAddProductSerializer, WishlistSerializer,
@@ -20,6 +20,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from .permissions import IsCartOwner, IsSuperuserOrAdmin
 from django.core.mail import EmailMultiAlternatives
+from django.utils import timezone
+
 # Create your views here.
 class CustomerRegistrationView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -215,69 +217,69 @@ class CartItemDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CartItemSerializer
     permission_classes = [IsAuthenticated, IsCartOwner]
 
-class PlaceOrderView(generics.CreateAPIView):
-    queryset = Order.objects.all()
-    serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, IsCartOwner]
+# class PlaceOrderView(generics.CreateAPIView):
+#     queryset = Order.objects.all()
+#     serializer_class = OrderSerializer
+#     permission_classes = [IsAuthenticated, IsCartOwner]
 
-    def create(self, request, *args, **kwargs):
-        user = request.user
-        cart_items = CartItem.objects.filter(cart__user=user)
+#     def create(self, request, *args, **kwargs):
+#         user = request.user
+#         cart_items = CartItem.objects.filter(cart__user=user)
 
-        if not cart_items:
-            return Response({"message": "No cart items found"}, status=status.HTTP_400_BAD_REQUEST)
+#         if not cart_items:
+#             return Response({"message": "No cart items found"}, status=status.HTTP_400_BAD_REQUEST)
 
-        total_amount = 0
-        order_items = []
+#         total_amount = 0
+#         order_items = []
 
-        for cart_item in cart_items:
-            item_amount = cart_item.product.price * cart_item.quantity
-            total_amount += cart_item.product.price * cart_item.quantity
-            order_items.append({
-                "product": cart_item.product,
-                "quantity": cart_item.quantity,
-                "price_at_order": cart_item.product.price,
-                "amount": item_amount,
-            })
+#         for cart_item in cart_items:
+#             item_amount = cart_item.product.price * cart_item.quantity
+#             total_amount += cart_item.product.price * cart_item.quantity
+#             order_items.append({
+#                 "product": cart_item.product,
+#                 "quantity": cart_item.quantity,
+#                 "price_at_order": cart_item.product.price,
+#                 "amount": item_amount,
+#             })
 
-        shipping_address = request.data.get("shipping_address")
-        payment_method = request.data.get("payment_method")
+#         shipping_address = request.data.get("shipping_address")
+#         payment_method = request.data.get("payment_method")
 
-        order = Order.objects.create(
-            user=user,
-            total_amount=total_amount,
-            shipping_address=shipping_address,
-            payment_method=payment_method,
-        )
+#         order = Order.objects.create(
+#             user=user,
+#             total_amount=total_amount,
+#             shipping_address=shipping_address,
+#             payment_method=payment_method,
+#         )
 
-        for item in order_items:
-            product = item['product']
-            quantity = item['quantity']
-            price_at_order = item['price_at_order']
-            product.quantity -= quantity
-            product.save()
+#         for item in order_items:
+#             product = item['product']
+#             quantity = item['quantity']
+#             price_at_order = item['price_at_order']
+#             product.quantity -= quantity
+#             product.save()
 
-            OrderItem.objects.create(order=order, product=product, quantity=quantity,price_at_order=price_at_order)
+#             OrderItem.objects.create(order=order, product=product, quantity=quantity,price_at_order=price_at_order)
 
-            cart_item = CartItem.objects.get(cart__user=user, product=product)
-            cart_item.delete()
+#             cart_item = CartItem.objects.get(cart__user=user, product=product)
+#             cart_item.delete()
 
-        user_subject = 'Order Confirmation'
-        user_message = render_to_string('ecommerce_app/order_confirmation.html', {
-            'user': user,
-            'order_items': order_items,
-            'order': order,
-        })
-        user_message_plain = strip_tags(user_message)
-        send_mail(user_subject, user_message_plain, 'your-email@example.com', [user.email], html_message=user_message)
+#         user_subject = 'Order Confirmation'
+#         user_message = render_to_string('ecommerce_app/order_confirmation.html', {
+#             'user': user,
+#             'order_items': order_items,
+#             'order': order,
+#         })
+#         user_message_plain = strip_tags(user_message)
+#         send_mail(user_subject, user_message_plain, 'your-email@example.com', [user.email], html_message=user_message)
 
-        admin_subject = 'New Order'
-        admin_message = f"A new order has been placed. Order ID: {order.id}"
-        send_mail(admin_subject, admin_message, 'your-email@example.com', ['admin-email@example.com'])
+#         admin_subject = 'New Order'
+#         admin_message = f"A new order has been placed. Order ID: {order.id}"
+#         send_mail(admin_subject, admin_message, 'your-email@example.com', ['admin-email@example.com'])
 
-        serializer = self.get_serializer(order)
+#         serializer = self.get_serializer(order)
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class AdminOrderView(APIView):
     permission_classes = [permissions.IsAdminUser]
@@ -445,3 +447,193 @@ class ProductReviewListView(generics.ListAPIView):
         if product_id:
             return ProductReview.objects.filter(product_id=product_id)
         return ProductReview.objects.all()
+
+
+class CreateCouponView(generics.CreateAPIView):
+    queryset = Coupon.objects.all()
+    serializer_class = CouponSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+
+class ListCouponsView(generics.ListAPIView):
+    queryset = Coupon.objects.filter(start_date__lte=timezone.now(), end_date__gte=timezone.now())
+    serializer_class = CouponSerializer
+    permission_classes = [IsAuthenticated]
+
+class ValidateCouponForCartView(generics.CreateAPIView):
+    serializer_class = CouponSerializer
+    permission_classes = [IsAuthenticated, IsCartOwner]
+    def get_object(self):
+        coupon_code = self.kwargs['coupon_code']
+        try:
+            coupon = Coupon.objects.get(coupon_code=coupon_code, start_date__lte=timezone.now(), end_date__gte=timezone.now())
+            return coupon
+        except Coupon.DoesNotExist:
+            return None
+    def calculate_discount(self, coupon, cart_items):
+        discount_details = {
+            'discount_type': coupon.discount_type,
+            'discount_value': coupon.discount_value,
+            'discount_amount': 0, 
+        }
+        cart_total = sum(cart_item.product.price * cart_item.quantity for cart_item in cart_items)
+        if coupon.discount_type == 'percentage':
+        # Calculate discount for percentage type coupon
+            if cart_total >= coupon.min_purchase_amount:
+                discount_details['discount_amount'] = (coupon.discount_value / 100) * cart_total
+                return discount_details
+
+        elif coupon.discount_type == 'amount':
+            # Calculate discount for fixed amount type coupon
+            if cart_total >= coupon.min_purchase_amount:
+                discount_details['discount_amount'] = coupon.discount_value
+                return discount_details
+
+        return None  # Return None if the coupon doesn't apply to the cart
+    def create(self, request, *args, **kwargs):
+        coupon_code = request.data.get('coupon_code', '')  # Get the coupon code from the request body
+
+        if not coupon_code:
+            return Response({"message": "Coupon code is required in the request body"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            coupon = Coupon.objects.get(
+                coupon_code=coupon_code,
+                start_date__lte=timezone.now(),
+                end_date__gte=timezone.now(),
+            )
+        except Coupon.DoesNotExist:
+            return Response({"message": "Invalid or expired coupon code"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get the authenticated user's cart items.
+        cart_items = CartItem.objects.filter(cart__user=request.user)
+
+        discount_details = self.calculate_discount(coupon, cart_items)
+
+        if not discount_details:
+            return Response({"message": "Coupon does not apply to the cart items"}, status=status.HTTP_400_BAD_REQUEST)
+        cart_total = sum(cart_item.product.price * cart_item.quantity for cart_item in cart_items)
+        final_price = cart_total - discount_details["discount_amount"]
+        response_data = {
+            "original_total_amount": cart_total,
+            "discount_details": discount_details,
+            "final_price": final_price,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+class PlaceOrderView(generics.CreateAPIView):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated, IsCartOwner]
+    def calculate_discount(self, coupon, cart_items):
+        discount_details = {
+            'discount_type': coupon.discount_type,
+            'discount_value': coupon.discount_value,
+            'discount_amount': 0, 
+        }
+        cart_total = sum(cart_item.product.price * cart_item.quantity for cart_item in cart_items)
+        if coupon.discount_type == 'percentage':
+        # Calculate discount for percentage type coupon
+            if cart_total >= coupon.min_purchase_amount:
+                discount_details['discount_amount'] = (coupon.discount_value / 100) * cart_total
+                return discount_details
+
+        elif coupon.discount_type == 'amount':
+            # Calculate discount for fixed amount type coupon
+            if cart_total >= coupon.min_purchase_amount:
+                discount_details['discount_amount'] = coupon.discount_value
+                return discount_details
+
+        return None  # Return None if the coupon doesn't apply to the cart
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        cart_items = CartItem.objects.filter(cart__user=user)
+
+        if not cart_items:
+            return Response({"message": "No cart items found"}, status=status.HTTP_400_BAD_REQUEST)
+        # Check if the coupon code has already been applied to any order
+        coupon_code = request.data.get("coupon_code")
+        if coupon_code and Order.objects.filter(coupon_code=coupon_code, coupon_applied=True).exists():
+            return Response({"message": "Coupon has already been used"}, status=status.HTTP_400_BAD_REQUEST)
+        # Calculate the total amount for the order without applying the coupon
+        total_amount_without_coupon = sum(cart_item.product.price * cart_item.quantity for cart_item in cart_items)
+
+        # Get the coupon code from the request data
+        coupon_code = request.data.get("coupon_code")
+        # Initialize discount_amount to zero
+        discount_amount = 0
+        # Apply the coupon discount if a valid coupon code is provided
+        if coupon_code:
+            try:
+                coupon = Coupon.objects.get(
+                    coupon_code=coupon_code,
+                    start_date__lte=timezone.now(),
+                    end_date__gte=timezone.now(),
+                )
+                
+                # Check if the coupon can still be used (max_usage check)
+                if coupon.max_usage is not None and coupon.max_usage <= 0:
+                    return Response({"message": "Coupon has reached its maximum usage limit"}, status=status.HTTP_400_BAD_REQUEST)
+
+                # Calculate discount details
+                discount_details = self.calculate_discount(coupon, cart_items)
+
+                if discount_details:
+                    discount_amount = discount_details["discount_amount"]
+                    total_amount = total_amount_without_coupon - discount_amount
+
+                    # Decrease the max_usage of the coupon by 1
+                    if coupon.max_usage is not None:
+                        coupon.max_usage -= 1
+                        coupon.save()
+                else:
+                    return Response({"message": "Coupon does not apply to the cart items"}, status=status.HTTP_400_BAD_REQUEST)
+            except Coupon.DoesNotExist:
+                return Response({"message": "Invalid or expired coupon code"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            total_amount = total_amount_without_coupon
+
+        shipping_address = request.data.get("shipping_address")
+        payment_method = request.data.get("payment_method")
+
+        order = Order.objects.create(
+            user=user,
+            total_amount_without_coupon=total_amount_without_coupon,
+            total_amount=total_amount,
+            shipping_address=shipping_address,
+            payment_method=payment_method,
+            coupon_code=coupon_code,  # Add the coupon code to the order
+            discounted_amount=discount_amount,  # Add the discounted amount to the order
+        )
+        order.coupon_applied = True
+        order.save()
+        order_items = []
+        for cart_item in cart_items:
+            product = cart_item.product
+            quantity = cart_item.quantity
+            price_at_order = product.price
+            product.quantity -= quantity
+            product.save()
+
+            order_item = OrderItem.objects.create(order=order, product=product, quantity=quantity, price_at_order=price_at_order)
+            order_items.append(order_item)
+            cart_item.delete()
+
+        user_subject = 'Order Confirmation'
+        user_message = render_to_string('ecommerce_app/order_confirmation.html', {
+            'user': user,
+            'order_items': order_items,
+            'order': order,
+            'discounted_amount': discount_amount,
+        })
+        user_message_plain = strip_tags(user_message)
+        send_mail(user_subject, user_message_plain, 'your-email@example.com', [user.email], html_message=user_message)
+
+        admin_subject = 'New Order'
+        admin_message = f"A new order has been placed. Order ID: {order.id}"
+        send_mail(admin_subject, admin_message, 'your-email@example.com', ['admin-email@example.com'])
+
+        serializer = self.get_serializer(order)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

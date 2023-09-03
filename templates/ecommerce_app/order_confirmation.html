@@ -8,17 +8,20 @@
 </head>
 <body>
     <h2>Order Confirmation</h2>
-    <p>Hello {{ user.username }},</p>
+    <p>Hello {{ user.first_name }} {{ user.last_name }},</p>
     <p>Your order has been placed successfully!</p>
     <p>Order Details:</p>
     <ul>
         {% for item in order_items %}
-            <li>{{ item.product.name }} x {{ item.quantity }} - ${{ item.price_at_order }} Amount: ${{ item.amount }}</li>
+            <li>{{ item.product.name }} x {{ item.quantity }} - Price: ${{ item.product.price }} </li>
         {% endfor %}
     </ul>
-    <p>Total Amount: ${{ order.total_amount }}</p>
+    <p>Total Amount (Without Discount): ${{ order.total_amount_without_coupon }}</p>
+    <p>Total Amount (With Discount): ${{ order.total_amount }}</p>
     <p>Shipping Address: {{ order.shipping_address }}</p>
     <p>Payment Method: {{ order.payment_method }}</p>
+    <p>Coupon Code: {{ order.coupon_code }}</p>
+    <p>Discount Amount: ${{ order.discounted_amount }}</p>
     <p>Thank you for shopping with us!</p>
 </body>
 </html>
